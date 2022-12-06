@@ -1,4 +1,4 @@
-Branch of ICCS MiMA fork implementing Minah Yang's Portran-pytorch forpy interface.
+Branch of ICCS MiMA fork implementing Minah Yang's Fortran-pytorch forpy interface.
 
 
 # Model of an idealized Moist Atmosphere (MiMA) [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.597136.svg)](https://doi.org/10.5281/zenodo.597136)
