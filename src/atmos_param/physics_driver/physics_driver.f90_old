@@ -122,8 +122,8 @@ use radiative_gases_mod,     only: radiative_gases_init,   &
 
 use damping_driver_mod,      only: damping_driver,      &
                                    damping_driver_init, &
-                                   damping_driver_end, &
-                                   get_psfc !lmy: get surface pressure for cg_drag ML models.
+                                   damping_driver_end
+
 use grey_radiation_mod, only: grey_radiation_init, grey_radiation, grey_radiation_end
 
 use local_heating_mod, only:  local_heating_init,local_heating
@@ -133,7 +133,7 @@ use rrtmg_lw_init
 use rrtmg_lw_rad
 use rrtmg_sw_init
 use rrtmg_sw_rad
-use rrtm_radiation 
+use rrtm_radiation
 use rrtm_vars     
 !-----------------------------------------------------------------
 
@@ -859,7 +859,6 @@ subroutine physics_driver_down (is, ie, js, je,                       &
                                 flux_sw_vis_dif,                      &
                                 flux_lw,  coszen,  gust,              &
                                 Surf_diff,                            &
-                                wg_full,                              &
                                 mask, kbot, diff_cum_mom,             &
                                 moist_convect, diffm, difft  )
 
@@ -876,7 +875,6 @@ type(time_type),         intent(in)             :: Time_prev, Time,  &
 real,dimension(:,:),     intent(in)             :: lat, lon, area
 real,dimension(:,:,:),   intent(in)             :: p_half, p_full,   &
                                                    z_half, z_full,   &
-                                                   wg_full,          &
                                                    u , v , t , q ,   &
                                                    um, vm, tm, qm
 real,dimension(:,:,:,:), intent(inout)          :: r
@@ -993,7 +991,7 @@ real,  dimension(:,:,:), intent(out)  ,optional :: diffm, difft
 
       real, dimension(size(u,1),size(u,2),size(u,3)) :: diff_t_vert, &
                                                         diff_m_vert
-      real, dimension(size(u,1),size(u,2))           :: z_pbl, psfc
+      real, dimension(size(u,1),size(u,2))           :: z_pbl 
       type(aerosol_type)                             :: Aerosol
       type(cld_specification_type)                   :: Cld_spec
       type(radiative_gases_type)                     :: Rad_gases
@@ -1122,7 +1120,6 @@ real,  dimension(:,:,:), intent(out)  ,optional :: diffm, difft
 !    Atmos_input.
 !---------------------------------------------------------------------
       if (need_basic) then
-        print *, 'define_atmos_input_fields is called'
         call define_atmos_input_fields     &
                               (is, ie, js, je, p_full, p_half, t, q,  &
                                t_surf_rad, Atmos_input, kbot=kbot)
@@ -1262,7 +1259,6 @@ real,  dimension(:,:,:), intent(out)  ,optional :: diffm, difft
       if (need_aerosols) then
         call aerosol_dealloc (Aerosol)
       endif
-      ! print *, 'Atmos input has size', size(Atmos_input%press,1), '-by-', size(Atmos_input%press,2), '-by-', size(Atmos_input%press,3),'.'
       if (need_basic) then
         call atmos_input_dealloc (Atmos_input)
       endif
@@ -1307,12 +1303,11 @@ real,  dimension(:,:,:), intent(out)  ,optional :: diffm, difft
       z_pbl(:,:) = pbltop(is:ie,js:je) 
       if(do_damping) then
         call mpp_clock_begin ( damping_clock )
-        call get_psfc(is, ie, js, je, p_half, t, psfc, kbot=kbot) !lmy: get surface pressure
-        call damping_driver (is, js, lat, Time_next, dt,         &
+        call damping_driver (is, js, lat, Time_next, dt,           &
                              p_full, p_half, z_full, z_half,          &
                              um, vm, tm, qm, rm(:,:,:,1:ntp), &
                              udt, vdt, tdt, qdt, rdt,&
-                             z_pbl , wg_full, psfc, mask=mask, kbot=kbot)
+                             z_pbl , mask=mask, kbot=kbot)
        call mpp_clock_end ( damping_clock )
      endif
 

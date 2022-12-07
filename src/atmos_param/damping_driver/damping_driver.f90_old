@@ -34,8 +34,7 @@ module damping_driver_mod
  implicit none
  private
 
- public   damping_driver, damping_driver_init, damping_driver_end, &
-        get_psfc !lmy: get surface pressure for cg_drag ML models
+ public   damping_driver, damping_driver_init, damping_driver_end
 
 !-----------------------------------------------------------------------
 !---------------------- namelist ---------------------------------------
@@ -117,8 +116,9 @@ contains
 !#######################################################################
 
  subroutine damping_driver (is, js, lat, Time, delt, pfull, phalf, zfull, zhalf, &
-                            u, v, t, q, r,  udt, vdt, tdt, qdt, rdt,  & ! mask, kbot)
-                            z_pbl, wg_full, psfc, mask, kbot)
+                            u, v, t, q, r,  udt, vdt, tdt, qdt, rdt,  &
+!                                   mask, kbot)
+                            z_pbl,  mask, kbot)
 
 !-----------------------------------------------------------------------
  integer,         intent(in)                :: is, js
@@ -127,12 +127,11 @@ contains
  real,            intent(in)                :: delt
  real,    intent(in),    dimension(:,:,:)   :: pfull, phalf, &
                                                zfull, zhalf, &
-                                               wg_full, & 
                                                u, v, t, q
  real,    intent(in),    dimension(:,:,:,:) :: r
  real,    intent(inout), dimension(:,:,:)   :: udt,vdt,tdt,qdt
  real,    intent(inout), dimension(:,:,:,:) :: rdt
- real, dimension(:,:), intent(in)           :: z_pbl, psfc
+ real, dimension(:,:), intent(in)           :: z_pbl
  real,    intent(in),    dimension(:,:,:), optional :: mask
  integer, intent(in),    dimension(:,:),   optional :: kbot
 
@@ -148,7 +147,6 @@ contains
                                                             t_pass
  integer :: k, j, i, locmax(3)
  real :: a,b
- ! real, dimension(size(lat,1),size(lat,2))                :: psfc
 !-----------------------------------------------------------------------
 !mj constant drag TOA
  real :: minp,cosday
@@ -254,7 +252,7 @@ contains
 !mj updating call to riga version of cg_drag
       !call cg_drag_calc (is, js, lat, pfull, zfull, t, u, Time,    &
       !                  delt, utnd)
-      call cg_drag_calc (is, js, lat, pfull, zfull, wg_full, psfc, t, u, v, Time, delt, utnd, vtnd)
+      call cg_drag_calc (is, js, lat, pfull, zfull, t, u, v, Time, delt, utnd, vtnd)
      udt =  udt + utnd
      vdt =  vdt + vtnd !mj
 
@@ -617,75 +615,6 @@ endif
 
  end subroutine rayleigh
 
-subroutine  get_psfc(is, ie, js, je, phalf, t, psfc, kbot)     
-
-  !---------------------------------------------------------------------
-  !    get_psfc just gets surface pressure.
-  !---------------------------------------------------------------------
-  integer,                 intent(in)              :: is, ie, js, je
-  real, dimension(:,:,:),  intent(in)              :: phalf, t
-  real, dimension(:,:),    intent(inout)           :: psfc
-  integer, dimension(:,:), intent(in), optional    :: kbot
-  
-
-  !---------------------------------------------------------------------
-  !   intent(in) variables:
-  !
-  !      is,ie,js,je  starting/ending subdomain i,j indices of data in 
-  !                   the physics_window being integrated
-  !      phalf        pressure at half levels [ kg / (m s^2) ]
-  !      t            temperature at full levels [ deg K]
-  !
-  !   intent(inout) variables:
-  !   psfc          surface pressure 
-  !                       [ (kg /( m s^2) ] 
-  !
-  !   intent(in), optional variables:
-  !
-  !      kbot               present when running eta vertical coordinate,
-  !                         index of lowest model level above ground (???)
-  !---------------------------------------------------------------------
-
-  !---------------------------------------------------------------------
-  !  local variables
-
-  integer :: i, j, kb
-  integer :: kmax
-  real, dimension (size(t,1), size(t,2), size(t,3)+1) ::  phalf2
-
-  !---------------------------------------------------------------------
-  !  local variables
-  !
-  !     i, j         do loop indices
-  !     kb           vertical index of lowest atmospheric level (when
-  !                  using eta coordinates)
-  !     kmax         number of model layers
-  !
-  !---------------------------------------------------------------------
-  !----------------------------------------------------------------------
-  !    define the number of model layers.
-  !----------------------------------------------------------------------
-  kmax = size(t,3)
-  ! print *, 'we are NOT doing data override.'
-  phalf2(:,:,kmax+1) = phalf(:,:,kmax+1)
-
-  ! allocate psfc(size(t,1),size(t,2))
-  !--------------------------------------------------------------------
-  !    define values of surface pressure.
-  !--------------------------------------------------------------------
-  if (present(kbot)) then
-    do j=1,je-js+1
-      do i=1,ie-is+1
-        kb = kbot(i,j)
-        psfc(i,j) = phalf2(i,j,kb+1)
-      end do
-    end do
-  else
-    psfc(:,:) = phalf2(:,:,kmax+1)
-  endif
-
-
-end subroutine get_psfc
 !#######################################################################
 
 end module damping_driver_mod

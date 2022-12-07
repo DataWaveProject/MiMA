@@ -202,12 +202,11 @@ subroutine spectral_physics_down(Time_prev, Time, Time_next, previous, current, 
                         albedo_vis_dir, albedo_nir_dir, albedo_vis_dif, albedo_nir_dif,                           &
                         dt_ug, dt_vg, dt_tg, dt_tracers, flux_sw, flux_sw_dir, flux_sw_dif, flux_sw_down_vis_dir, &
                         flux_sw_down_vis_dif, flux_sw_down_total_dir, flux_sw_down_total_dif, flux_sw_vis,        &
-                        flux_sw_vis_dir, flux_sw_vis_dif, flux_lw, coszen, gust, Surf_diff,                       &
-                        wg_full)
+                        flux_sw_vis_dir, flux_sw_vis_dif, flux_lw, coszen, gust, Surf_diff)
 
 type(time_type), intent(in) :: Time_prev, Time, Time_next
 integer, intent(in)         :: previous, current
-real,    intent(in),    dimension(:,:,:    ) :: p_full, z_full, wg_full
+real,    intent(in),    dimension(:,:,:    ) :: p_full, z_full
 real,    intent(in),    dimension(:,:,:    ) :: p_half, z_half
 real,    intent(in),    dimension(:,:,:    ) :: psg
 real,    intent(in),    dimension(:,:,:,:  ) :: ug, vg, tg
@@ -247,8 +246,7 @@ if(do_moist_in_phys_up()) then
                flux_sw_down_vis_dif, flux_sw_down_total_dir,                     &
                flux_sw_down_total_dif, flux_sw_vis,                              &
                flux_sw_vis_dir, flux_sw_vis_dif,                                 &
-               flux_lw, coszen, gust, Surf_diff,                                 &
-               wg_full)
+               flux_lw, coszen, gust, Surf_diff)
 else
   call physics_driver_down(1, ie-is+1, 1, je-js+1, Time_prev, Time, Time_next,   &
             rad_lat_2d,    rad_lon_2d,  area_2d,                                 &
@@ -268,9 +266,8 @@ else
                flux_sw_down_vis_dif, flux_sw_down_total_dir,                     &
                flux_sw_down_total_dif, flux_sw_vis,                              &
                flux_sw_vis_dir, flux_sw_vis_dif,                                 &
-               flux_lw, coszen, gust, Surf_diff,                                 &
-               wg_full,                                                          &
-               diff_cum_mom=diff_cu_mo, moist_convect=convect)
+               flux_lw, coszen, gust, Surf_diff, diff_cum_mom=diff_cu_mo,        &
+               moist_convect=convect)
 endif
 
 return
