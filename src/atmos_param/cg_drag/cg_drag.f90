@@ -1768,10 +1768,7 @@ subroutine get_model_prediction(run_emulator, model, X3, X2, Y_out)
     Y_out=0.0 
     ! Print *, Y_out(1,1,1)
     ! ie = call_py(Y_out_obj, run_emulator, "compute_reshape_drag", args)
-    write(*,*) "Got to here..."
     ie = call_py_noret(run_emulator, "compute_reshape_drag", args)
-    write(*,*) "Completed compute_reshape"
-    write(*,*) ie
     ! ie = cast(Y_out_nd, Y_out_obj)
     ! ie = cast(Y_out, Y_out_nd)
     ! ie = print_py(Y_out_nd)
