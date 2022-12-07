@@ -3,8 +3,9 @@
 set echo 
 #--------------------------------------------------------------------------------------------------------
 # define variables
-set platform  = nci                                   # A unique identifier for your platform
-set npes      = $PBS_NCPUS                            # number of processors
+set platform  = csd3                                  # A unique identifier for your platform
+set PBS_NCPUS = 8
+set npes      = $PBS_NCPUS                            # number of processors to run Make
 set template  = $cwd/../bin/mkmf.template.$platform   # path to template for your platform
 set mkmf      = $cwd/../bin/mkmf                      # path to executable mkmf
 set sourcedir = $cwd/../src                           # path to directory containing model source code
