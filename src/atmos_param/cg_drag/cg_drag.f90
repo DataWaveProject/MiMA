@@ -175,8 +175,8 @@ real,    dimension(MAX_PTS)  ::  lon_coords_gl=-999.
 
 !forpy controls added to namelist
 logical            :: use_forpy = .true.
+character(len=128) :: pypath
 character(len=128) :: re_pypath
-
 
 namelist / cg_drag_nml /         &
                           cg_drag_freq, cg_drag_offset, &
@@ -189,7 +189,7 @@ namelist / cg_drag_nml /         &
                           lat_coords_gl, lon_coords_gl, &
                           phi0n,phi0s,dphin,dphis, Bw, Bn, cw, cwtropics, cn, flag, &
                           weightminus2, weightminus1, weighttop, kelvin_kludge, &
-                          use_forpy, re_pypath
+                          use_forpy, pypath, re_pypath
 
 
 !--------------------------------------------------------------------
@@ -392,6 +392,7 @@ re_pypath='run_emulator2'
 10      call close_file (unit)
       endif
 re_pypath = trim(re_pypath)
+re_pypath = trim(pypath)
 if (use_forpy) then
     print *, re_pypath
 else
@@ -619,7 +620,7 @@ if (use_forpy) then
     ie = forpy_initialize()
     ! Add the directory containing forpy related scripts and data to sys.path
     ie = get_sys_path(paths)
-    ie = paths%append("/home/jwa34/rds/hpc-work/MiMA_minah/")
+    ie = paths%append(pypath)
     ! import python modules
     ie = import_py(run_emulator, re_pypath)
     ! call initialize from run_emulator python module, which loads a trained model.
