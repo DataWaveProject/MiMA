@@ -29,10 +29,9 @@ use forpy_mod,              only:  import_py, module_py, call_py, object, ndarra
                                    forpy_initialize, forpy_finalize, tuple, tuple_create, &
                                    ndarray_create, cast, print_py, dict, dict_create, err_print, &
                                    call_py_noret, list, get_sys_path, ndarray_create_nocopy, &
-                                   ndarray_create_empty, ndarray_create_zeros!, getdata
+                                   ndarray_create_empty, ndarray_create_zeros, str, str_create!, getdata
 
 use iso_fortran_env,        only:  real64, real32
-
 
 !-------------------------------------------------------------------
 
@@ -293,6 +292,7 @@ type(module_py) :: run_emulator
 type(list) :: paths
 type(object) :: model! , Y_out_obj
 type(tuple) :: args
+type(str) :: py_pypath
 real, dimension(:,:,:), allocatable :: X3
 real, dimension(:,:)  , allocatable :: X2
 real, dimension(:,:,:), asynchronous, allocatable :: Y_out
@@ -392,8 +392,9 @@ re_pypath='run_emulator2'
 10      call close_file (unit)
       endif
 re_pypath = trim(re_pypath)
-re_pypath = trim(pypath)
+ie = str_create(py_pypath, trim(pypath))
 if (use_forpy) then
+    print *, pypath
     print *, re_pypath
 else
     print *, 'Use AD99'
@@ -620,7 +621,7 @@ if (use_forpy) then
     ie = forpy_initialize()
     ! Add the directory containing forpy related scripts and data to sys.path
     ie = get_sys_path(paths)
-    ie = paths%append(pypath)
+    ie = paths%append(py_pypath)
     ! import python modules
     ie = import_py(run_emulator, re_pypath)
     ! call initialize from run_emulator python module, which loads a trained model.
