@@ -106,6 +106,7 @@ mpp/mpp_domains_reduce.F90
 mpp/mpp_domains.F90
 mpp/mpp_parameter.F90
 mpp/mpp_io_util.F90
+forpy/forpy_mod.F90
 )
 
 target_sources ( mima.x PRIVATE ${SHARED_SOURCES} )
