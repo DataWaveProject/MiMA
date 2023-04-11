@@ -4,25 +4,35 @@
 ulimit -s unlimited
 
 # MiMA must be compiled and all modules must be loaded before running
-N_PROCS=8
-mppncombine="../../build/mppnccombine"
-executable="../../build/mima.x"
+N_PROCS=4
+PATH_TO_CCOMB="../../build/mppnccombine"
+PATH_TO_EXEC="../../build/mima.x"
 
-echo "Single timestep run"
-echo "Executable in ${executable}"
-echo "Run with $N_PROCS processors"
+# OPTIONAL VALUES TO CHANGE PATH TO EXECUTABLE ETC
+while getopts p:x:c: flag
+do
+    case "${flag}" in
+        p) N_PROCS=${OPTARG};;
+        x) PATH_TO_EXEC=${OPTARG};;
+        c) PATH_TO_CCOMB=${OPTARG};;
+    esac
+done
+
+echo "Number of processors: $N_PROCS"
+echo "Path to mima executable: $PATH_TO_EXEC"
+echo "Path to mppncombine executable: $PATH_TO_CCOMB"
 
 ulimit -s unlimited
 
 echo "run MiMA"
 [ ! -d RESTART ] && mkdir RESTART
 
-srun --ntasks $N_PROCS $executable
+srun --ntasks $N_PROCS $PATH_TO_EXEC
 
-echo "Run complete. Postprocess with mppncombine in ${mppncombine}"
+echo "Run complete. Postprocess with mppncombine in ${PATH_TO_CCOMB}"
 
-$mppncombine -r atmos_daily.nc atmos_daily.nc.????
-$mppncombine -r atmos_avg.nc atmos_avg.nc.????
+${PATH_TO_CCOMB} -r atmos_daily.nc atmos_daily.nc.????
+${PATH_TO_CCOMB} -r atmos_avg.nc atmos_avg.nc.????
 
 echo "Done"
 
