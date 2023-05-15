@@ -16,6 +16,10 @@ use diag_manager_mod,       only:  diag_manager_init,   &
 use constants_mod,          only:  constants_init, PI, RDGAS, GRAV, CP_AIR, &
                                    SECONDS_PER_DAY
 
+use mpp_mod,                only: mpp_clock_id, mpp_clock_begin, mpp_clock_end
+
+use cg_drag_ML_mod,              only:  cg_drag_ML_init, cg_drag_ML_end, cg_drag_ML
+
 #ifdef COL_DIAG
 use column_diagnostics_mod, only:  column_diagnostics_init, &
                                    initialize_diagnostic_columns, &
@@ -87,7 +91,9 @@ real        :: source_level_pressure= 315.e+02
                                   ! wave source level at the equator 
                                   ! [ Pa ]
 real       ::  damp_level_pressure=0.8e+02
-				  ! added by cig, feb 27, 2017. any waves reaching the top level will  be deposited down to this level
+                                  ! added by cig, feb 27, 2017. any waves
+                                  ! reaching the top level will  be
+                                  ! deposited down to this level
 integer     :: nk=1               ! number of wavelengths contained in 
                                   ! the gravity wave spectrum
 real        :: cmax=99.6          ! maximum phase speed in gravity wave
@@ -159,6 +165,13 @@ real,    dimension(MAX_PTS)  ::  lon_coords_gl=-999.
                                   ! longitudes for latlon diagnostic 
                                   ! columns [ degrees, 0. -> 360. ]
 
+logical :: runML=.false.
+                                  ! are we using ML to calculate the drag?
+
+character(len=1024) :: model_dir="undefined/"
+                                  ! Full filepath to directory contaioning ML model
+character(len=1024) :: model_name="undefined"
+                                  ! Filename of ML model/name of script to run
 
 namelist / cg_drag_nml /         &
                           cg_drag_freq, cg_drag_offset, &
@@ -170,7 +183,9 @@ namelist / cg_drag_nml /         &
                           i_coords_gl, j_coords_gl,   &
                           lat_coords_gl, lon_coords_gl, &
                           phi0n,phi0s,dphin,dphis, Bw, Bn, cw, cwtropics, cn, flag, &
-			  weightminus2, weightminus1, weighttop,kelvin_kludge
+                          weightminus2, weightminus1, weighttop,kelvin_kludge,&
+                          ! Added for ML
+                          runML, model_dir, model_name
 
 
 !--------------------------------------------------------------------
@@ -216,7 +231,7 @@ integer    :: nc        ! number of wave speeds in spectrum
 integer    :: klevel_of_source, klevel_of_damp
                         ! k index of the gravity wave source level at
                         ! the equator in a standard atmosphere
-			! also k index of level up to where  mesosphere drag is dumped  (cig, feb 27 2017)
+                        ! also k index of level up to where  mesosphere drag is dumped  (cig, feb 27 2017)
 
 
 !---------------------------------------------------------------------
@@ -388,7 +403,7 @@ type(time_type),         intent(in)      :: Time
 !    ied as the source location via namelist input.
 !--------------------------------------------------------------------
       do k=1,kmax
-	 if (pref(k) < damp_level_pressure) then
+       if (pref(k) < damp_level_pressure) then
           klevel_of_damp = k        
         endif
         if (pref(k) > source_level_pressure) then
@@ -405,23 +420,23 @@ type(time_type),         intent(in)      :: Time
           lat(i,j)=  0.5*( latb(j+1)+latb(j) )
           source_level(i,j) = (kmax + 1) - ((kmax + 1 -    &
                               klevel_of_source)*cos(lat(i,j)) + 0.5)
-   	  
-	  damp_level(i,j) = klevel_of_damp  !cig
-	thislatdeg=lat(i,j)*pifinv
+  
+          damp_level(i,j) = klevel_of_damp  !cig
+          thislatdeg=lat(i,j)*pifinv
 !code added by ipw - nov 23, 2016
-       if (thislatdeg > phi0n) then
+          if (thislatdeg > phi0n) then
                 source_amp(i,j) = Bt_0 + Bt_nh*0.5*(1.+tanh((thislatdeg-phi0n)/dphin))+ &
                 Bt_sh*0.5*(1.+tanh((thislatdeg-phi0s)/dphis));
-        elseif (thislatdeg < phi0s) then
-               source_amp(i,j) = Bt_0 + Bt_nh*0.5*(1.+tanh((thislatdeg-phi0n)/dphin))+ &
-               Bt_sh*0.5*(1.+tanh((thislatdeg-phi0s)/dphis));
-        elseif ((thislatdeg <= dphin) .and. (thislatdeg >= dphis))  then
-	       source_amp(i,j) = Bt_eq
-	elseif ((thislatdeg <= phi0n) .and. (thislatdeg > dphin))  then
-		source_amp(i,j) = Bt_0 + (Bt_eq-Bt_0)/(phi0n-dphin)*(phi0n-thislatdeg)
-	elseif ((thislatdeg < dphis) .and. (thislatdeg >= phi0s))  then
-		source_amp(i,j) = Bt_0 + (Bt_eq-Bt_0)/(phi0s-dphis)*(phi0s-thislatdeg)
-	endif         
+          elseif (thislatdeg < phi0s) then
+                source_amp(i,j) = Bt_0 + Bt_nh*0.5*(1.+tanh((thislatdeg-phi0n)/dphin))+ &
+                Bt_sh*0.5*(1.+tanh((thislatdeg-phi0s)/dphis));
+          elseif ((thislatdeg <= dphin) .and. (thislatdeg >= dphis))  then
+                source_amp(i,j) = Bt_eq
+          elseif ((thislatdeg <= phi0n) .and. (thislatdeg > dphin))  then
+                source_amp(i,j) = Bt_0 + (Bt_eq-Bt_0)/(phi0n-dphin)*(phi0n-thislatdeg)
+          elseif ((thislatdeg < dphis) .and. (thislatdeg >= phi0s))  then
+                source_amp(i,j) = Bt_0 + (Bt_eq-Bt_0)/(phi0s-dphis)*(phi0s-thislatdeg)
+          endif         
 
 ! source_amp(i,j) = Bt_0 +                         &
 !                     Bt_nh*0.5*(1.+tanh((lat(i,j)/pif-phi0n)/dphin)) + &
@@ -570,7 +585,16 @@ type(time_type),         intent(in)      :: Time
      endif
 !!$      endif
 !!$      vers = restart_versions(size(restart_versions(:)))
-!!$     old_time_step = cgdrag_alarm 
+!!$     old_time_step = cgdrag_alarm
+
+
+!---------------------------------------------------------------------
+!    initialize the ML functionalities
+!---------------------------------------------------------------------
+      if (runML) then
+        call cg_drag_ML_init(model_dir, model_name)
+      endif
+
 !---------------------------------------------------------------------
 !    mark the module as initialized.
 !---------------------------------------------------------------------
@@ -617,7 +641,7 @@ end subroutine cg_drag_endts
 
 !####################################################################
 
-subroutine cg_drag_calc (is, js, lat, pfull, zfull, temp, uuu, vvv,  &
+subroutine cg_drag_calc (is, js, lat, pfull, zfull, psfc, temp, uuu, vvv,  &
                          Time, delt, gwfcng_x, gwfcng_y)
 !--------------------------------------------------------------------  
 !    cg_drag_calc defines the arrays needed to calculate the convective
@@ -629,11 +653,14 @@ subroutine cg_drag_calc (is, js, lat, pfull, zfull, temp, uuu, vvv,  &
 
 !---------------------------------------------------------------------
 integer,                intent(in)      :: is, js
-real, dimension(:,:),   intent(in)      :: lat
+real, dimension(:,:),   intent(in)      :: lat, psfc
 real, dimension(:,:,:), intent(in)      :: pfull, zfull, temp, uuu, vvv
 type(time_type),        intent(in)      :: Time
 real           ,        intent(in)      :: delt
 real, dimension(:,:,:), intent(out)     :: gwfcng_x, gwfcng_y
+
+! FIXME
+real, dimension(:,:,:), allocatable     :: gwfcng_x_AD, gwfcng_y_AD
 
 !-------------------------------------------------------------------
 !    intent(in) variables:
@@ -672,7 +699,7 @@ real, dimension(:,:,:), intent(out)     :: gwfcng_x, gwfcng_y
       integer           :: iz0
       logical           :: used
       real              :: bflim = 2.5E-5
-      integer           :: ie, je
+      integer           :: ie, je, timer_id
       integer           :: imax, jmax, kmax
       integer           :: i, j, k, nn
       real              :: pif = 3.14159265358979/180.
@@ -797,22 +824,67 @@ real, dimension(:,:,:), intent(out)     :: gwfcng_x, gwfcng_y
         end do
       
 !---------------------------------------------------------------------
-!    pass the vertically-extended input arrays to gwfc. gwfc will cal-
-!    culate the gravity-wave forcing and, if desired, an effective eddy 
-!    diffusion coefficient at each level above the source level. output
-!    is returned in the vertically-extended arrays gwfcng and ked_gwfc.
-!    upon return move the output fields into model-sized arrays. 
+!    calculate the gravity-wave forcing and, if desired, an effective
+!    eddy diffusion coefficient at each level above the source level.
+!    output is returned in the vertically-extended arrays gwfcng and
+!    ked_gwfc. upon return move the output fields into model-sized
+!    arrays.
+!    there are multiple options for calculating the gravity wave forcing
+!    gwfcng_x, gwfcng_y:
+!    - AD99 Parameterisation (gwfc subroutine)
+!    - Wavenet ML model via:
+!      - forpy python coupling,
+!      - PyTorch TorchScript coupling,
+!      - Tensorflow coupling
 !---------------------------------------------------------------------
-       call gwfc (is, ie, js, je, damp_level, source_level, source_amp, lat,   &
-                     zden, zu, zbf,zzchm, gwd_xtnd, ked_xtnd)
+       ! START OF ML COUPLING CHANGES
 
-          gwfcng_x  (:,:,1:kmax) = gwd_xtnd(:,:,1:kmax  )
-          ked_gwfc_x(:,:,1:kmax) = ked_xtnd(:,:,1:kmax  )
-          
-       call gwfc (is, ie, js, je, damp_level, source_level, source_amp,  lat,  &
-                     zden, zv, zbf,zzchm, gwd_ytnd, ked_ytnd)
-          gwfcng_y  (:,:,1:kmax) = gwd_ytnd(:,:,1:kmax  )
-          ked_gwfc_y(:,:,1:kmax) = ked_ytnd(:,:,1:kmax  )
+       timer_id = mpp_clock_id( 'cg_drag' )
+       call mpp_clock_begin(timer_id)
+
+       if (runML) then
+         call cg_drag_ML (uuu, vvv, psfc, lat, gwfcng_x, gwfcng_y)
+       else
+
+         ! AD99 Parameterisation from original code
+!       allocate(gwfcng_x_AD(size(gwfcng_x, 1), size(gwfcng_x, 2), size(gwfcng_x, 3)))
+!       allocate(gwfcng_y_AD(size(gwfcng_y, 1), size(gwfcng_y, 2), size(gwfcng_y, 3)))
+         call gwfc (is, ie, js, je, damp_level, source_level, source_amp, lat,   &
+                       zden, zu, zbf,zzchm, gwd_xtnd, ked_xtnd)
+         !gwfcng_x  (:,:,1:kmax) = gwd_xtnd(:,:,1:kmax  )
+         gwfcng_x  (:,:,1:kmax) = gwd_xtnd(:,:,1:kmax  )
+
+         call gwfc (is, ie, js, je, damp_level, source_level, source_amp,  lat,  &
+                       zden, zv, zbf,zzchm, gwd_ytnd, ked_ytnd)
+         !gwfcng_y  (:,:,1:kmax) = gwd_ytnd(:,:,1:kmax  )
+         gwfcng_y  (:,:,1:kmax) = gwd_ytnd(:,:,1:kmax  )
+
+       
+         ! TODO ked is only ever used as a diagnostic to be written out - we do not need to calculate it!
+         ! ked_gwfc_x(:,:,1:kmax) = ked_xtnd(:,:,1:kmax  )
+         ! ked_gwfc_y(:,:,1:kmax) = ked_ytnd(:,:,1:kmax  )
+       
+       endif
+! SJC Debug printing for ML GW computation
+!      if (mpp_pe() == mpp_root_pe()) then
+!        write(*,*)'uuu (1,1)'
+!        write(*,*) uuu(1,1,1:kmax)
+!        write(*,*)'psfc (1,1)'
+!        write(*,*) psfc(1,1)
+!        write(*,*)'lat (1,1)'
+!        write(*,*) lat(1,1)
+!        write(*,*)'AD output (1,1)'
+!        write(*,*) gwfcng_x_AD(1,1,1:kmax)
+!        write(*,*)'ML output (1,1)'
+!        write(*,*) gwfcng_x(1,1,1:kmax)
+!      endif
+!       stop
+!       deallocate(gwfcng_x_AD)
+!       deallocate(gwfcng_y_AD)
+
+       call mpp_clock_end(timer_id)
+       
+       ! END OF ML COUPLING CHANGES
           
 !--------------------------------------------------------------------
 !    store the gravity wave forcing into a processor-global array.
@@ -942,6 +1014,13 @@ subroutine cg_drag_end
         call close_column_diagnostics_units (diag_units)
       endif
 #endif
+
+!---------------------------------------------------------------------
+!    Clean up any ML detritus.
+!---------------------------------------------------------------------
+      if (runML) then
+        call cg_drag_ML_end
+      endif
 
 !---------------------------------------------------------------------
 !    mark the module as uninitialized.

@@ -26,3 +26,36 @@ AM2 is distributed under a GNU GPLv2 license. That means you have permission to 
 RRTM/RRTMG: Copyright © 2002-2010, Atmospheric and Environmental Research, Inc. (AER, Inc.). This software
 may be used, copied, or redistributed as long as it is not sold and this copyright notice is reproduced
 on each copy made. This model is provided as is without any express or implied warranties.
+
+
+## Building for Machine Learning
+
+### PyTorch
+* Requires the fortran-pytorch library available [here](https://github.com/Cambridge-ICCS/fortran-pytorch-lib)
+* Build with: 
+
+    cmake -DTorch_DIR=<Path-to-venv>/lib/python3.11/site-packages/torch/share/cmake/Torc
+
+* Build MiMA using:
+
+### TensorFlow
+* Requires the fortran-pytorch library available [here](https://github.com/Cambridge-ICCS/fortran-tf-lib)
+* Requires TensorFlow C API:
+
+    FILENAME=libtensorflow-cpu-linux-x86_64-2.11.0.tar.gz
+    wget -q --no-check-certificate https://storage.googleapis.com/tensorflow/libtensorflow/${FILENAME}
+    tar -C <PATH_TO_INSTALL_LOCATION> -xzf ${FILENAME}
+
+* Build with:
+
+    cmake .. -DTENSORFLOW_LOCATION=<PATH_TO_TF_C_API_INSTALL_LOCATION> -DCMAKE_Fortran_COMPILER=ifort -DCMAKE_C_COMPILER=icc -DCMAKE_BUILD_TYPE=Release
+
+### Forpy
+* Requires a python venv with TensorFlow/PyTorch (and any other requirements) installed.
+
+### MiMA
+* Build with 
+
+    cmake -DFLAG_FOR_ML ..
+
+where `-DFLAG_FOR_ML` is one of `-DBUILD_PT_COUPLING`, `-DBUILD_TF_COUPLING`, `-DBUILD_FORPY_COUPLING`

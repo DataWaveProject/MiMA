@@ -1,5 +1,5 @@
 &coupler_nml
-   days   = 360,
+   days   = 10,
    dt_atmos =500,
    current_date = 0001,1,1,0,0,0
    calendar = 'thirty_day' /
@@ -130,8 +130,8 @@
      damp_level_pressure = 0.85e+02,
      cg_drag_freq = 21600,
      runML = .true.,
-     model_dir = 'unknown',
-     model_name = 'unknown.ext'/
+     model_dir = '/home/sjc306/hpc-work/Datawave/MiMA/src/shared/tensorflow/',
+     model_name = 'saved_model'/
 
  &moist_processes_nml
      do_bm           =.true.,   

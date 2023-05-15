@@ -115,19 +115,18 @@ contains
 
 !#######################################################################
 
- subroutine damping_driver (is, js, lat, Time, delt, pfull, phalf, zfull, zhalf, &
-                            u, v, t, q, r,  udt, vdt, tdt, qdt, rdt,  &
-!                                   mask, kbot)
-                            z_pbl,  mask, kbot)
+ subroutine damping_driver (is, ie, js, je, lat, Time, delt, pfull, phalf, zfull, zhalf, &
+                            u, v, t, q, r,  udt, vdt, tdt, qdt, rdt,  & ! mask, kbot)
+                            z_pbl, temp, mask, kbot)
 
 !-----------------------------------------------------------------------
- integer,         intent(in)                :: is, js
+ integer,         intent(in)                :: is, ie, js, je
  real, dimension(:,:), intent(in)           :: lat
  type(time_type), intent(in)                :: Time
  real,            intent(in)                :: delt
  real,    intent(in),    dimension(:,:,:)   :: pfull, phalf, &
                                                zfull, zhalf, &
-                                               u, v, t, q
+                                               u, v, t, q, temp
  real,    intent(in),    dimension(:,:,:,:) :: r
  real,    intent(inout), dimension(:,:,:)   :: udt,vdt,tdt,qdt
  real,    intent(inout), dimension(:,:,:,:) :: rdt
@@ -136,7 +135,7 @@ contains
  integer, intent(in),    dimension(:,:),   optional :: kbot
 
 !-----------------------------------------------------------------------
- real, dimension(size(udt,1),size(udt,2))             :: diag2
+ real, dimension(size(udt,1),size(udt,2))             :: diag2, psfc
  real, dimension(size(udt,1),size(udt,2))             :: taubx, tauby
  real, dimension(size(udt,1),size(udt,2),size(udt,3)) :: taus
  real, dimension(size(udt,1),size(udt,2),size(udt,3)) :: utnd, vtnd, &
@@ -252,7 +251,8 @@ contains
 !mj updating call to riga version of cg_drag
       !call cg_drag_calc (is, js, lat, pfull, zfull, t, u, Time,    &
       !                  delt, utnd)
-      call cg_drag_calc (is, js, lat, pfull, zfull, t, u, v, Time, delt, utnd, vtnd)
+      call get_psfc(is, ie, js, je, phalf, temp, psfc, kbot)     
+      call cg_drag_calc (is, js, lat, pfull, zfull, psfc, t, u, v, Time, delt, utnd, vtnd)
      udt =  udt + utnd
      vdt =  vdt + vtnd !mj
 
@@ -615,6 +615,76 @@ endif
 
  end subroutine rayleigh
 
+
+subroutine  get_psfc(is, ie, js, je, phalf, t, psfc, kbot)     
+
+  !---------------------------------------------------------------------
+  !    get_psfc just gets surface pressure.
+  !---------------------------------------------------------------------
+  integer,                 intent(in)              :: is, ie, js, je
+  real, dimension(:,:,:),  intent(in)              :: phalf, t
+  real, dimension(:,:),    intent(out)             :: psfc
+  integer, dimension(:,:), intent(in), optional    :: kbot
+  
+
+  !---------------------------------------------------------------------
+  !   intent(in) variables:
+  !
+  !      is,ie,js,je  starting/ending subdomain i,j indices of data in 
+  !                   the physics_window being integrated
+  !      phalf        pressure at half levels [ kg / (m s^2) ]
+  !      t            temperature at full levels [ deg K]
+  !
+  !   intent(inout) variables:
+  !   psfc          surface pressure 
+  !                       [ (kg /( m s^2) ] 
+  !
+  !   intent(in), optional variables:
+  !
+  !      kbot               present when running eta vertical coordinate,
+  !                         index of lowest model level above ground (???)
+  !---------------------------------------------------------------------
+
+  !---------------------------------------------------------------------
+  !  local variables
+
+  integer :: i, j, kb
+  integer :: kmax
+!  real, dimension (size(t,1), size(t,2), size(t,3)+1) ::  phalf2
+
+  !---------------------------------------------------------------------
+  !  local variables
+  !
+  !     i, j         do loop indices
+  !     kb           vertical index of lowest atmospheric level (when
+  !                  using eta coordinates)
+  !     kmax         number of model layers
+  !
+  !---------------------------------------------------------------------
+  !----------------------------------------------------------------------
+  !    define the number of model layers.
+  !----------------------------------------------------------------------
+  kmax = size(t,3)
+  ! print *, 'we are NOT doing data override.'
+  !phalf2(:,:,kmax+1) = phalf(:,:,kmax+1)
+
+  ! allocate psfc(size(t,1),size(t,2))
+  !--------------------------------------------------------------------
+  !    define values of surface pressure.
+  !--------------------------------------------------------------------
+  if (present(kbot)) then
+    do j=1,je-js+1
+      do i=1,ie-is+1
+        kb = kbot(i,j)
+        psfc(i,j) = phalf(i,j,kb+1)
+      end do
+    end do
+  else
+    psfc(:,:) = phalf(:,:,kmax+1)
+  endif
+
+
+end subroutine get_psfc
 !#######################################################################
 
 end module damping_driver_mod
